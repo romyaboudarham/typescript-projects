@@ -12,7 +12,7 @@
  *
  * ── Your 6 TODOs ─────────────────────────────────────────────────────────────
  *  DONE A — Load a JPG texture onto each card
- *  TODO B — Add a timeline scrubber that moves the cards
+ *  DONE B — Add a timeline scrubber that moves the cards
  *  TODO C — Make cards snap to a grid when placed
  *  TODO D — Add a bloom / glow post-processing effect
  *  TODO E — Fix the race condition in the AI streaming call
@@ -41,6 +41,7 @@ interface CardEntry {
   group: THREE.Group;
   light: THREE.PointLight;
   mat: THREE.MeshStandardMaterial;
+  baseY: number;
 }
 
 type AiStatus = "idle" | "streaming" | "done" | "error";
@@ -136,6 +137,7 @@ export default function ConceptCanvas() {
   const raycaster   = useRef(new THREE.Raycaster());
   const mouse       = useRef(new THREE.Vector2());
   const frameRef    = useRef<number | null>(null);
+  const currentFrameRef = useRef(0);
   const drag        = useRef({ active: false, lastX: 0, lastY: 0 });
   const orbit       = useRef({ theta: 0, phi: 0, radius: 7 });
 
@@ -152,6 +154,7 @@ export default function ConceptCanvas() {
   const [aiStatus,     setAiStatus]     = useState<AiStatus>("idle");
 
   // TODO B — add state for currentFrame here
+  const [currentFrame, setCurrentFrame] = useState(0);
 
   // ── Scene init ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -238,7 +241,8 @@ export default function ConceptCanvas() {
       group.add(light);
 
       scene.add(group);
-      meshMapRef.current.set(card.id, { mesh, group, light, mat });
+      let baseY = card.position[1];
+      meshMapRef.current.set(card.id, { mesh, group, light, mat, baseY, });
     });
 
     // Render loop — completely decoupled from React's render cycle.
@@ -257,8 +261,9 @@ export default function ConceptCanvas() {
       }
 
       const t = now * 0.001;
-      meshMapRef.current.forEach(({ group }) => {
-        group.position.y += Math.sin(t + group.position.x * 1.2) * 0.00022;
+      meshMapRef.current.forEach(({ group, baseY }) => {
+        group.position.y = (currentFrameRef.current / 100 * 3) + baseY;
+        //group.position.y += Math.sin(t + group.position.x * 1.2) * 0.001;
       });
 
       // TODO D — call composer.render() here instead once bloom is set up
@@ -290,6 +295,10 @@ export default function ConceptCanvas() {
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement);
     };
   }, []);
+
+  useEffect(() => {
+    currentFrameRef.current = currentFrame;
+  }, [currentFrame]);
 
   // Mouse: orbit drag + raycast hover
   // Raycasting: mouse px → normalized device coords (-1 to +1) → ray into scene → hit test
@@ -407,6 +416,13 @@ export default function ConceptCanvas() {
       </div>
 
       {/* TODO B — render your timeline scrubber UI here */}
+      <div style={{
+          position: "absolute", bottom: 80, left: "50%", transform: "translateX(-50%)",
+          background: "rgba(8,8,16,0.88)", borderBottom: "1px solid rgba(255,255,255,0.06)",
+          backdropFilter: "blur(12px)", display: "flex", padding: "6px 18px",
+        }}>
+        <input type="range" min="0" max="100" value={currentFrame} onChange={(e) => setCurrentFrame(Number(e.target.value))}></input>
+      </div>
 
       {/* Hover label */}
       {hovCard && !selectedCard && (
