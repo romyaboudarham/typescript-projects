@@ -10,11 +10,13 @@
  *  • Streaming AI panel
  *  • FPS counter
  *
- * ── Your 4 TODOs ─────────────────────────────────────────────────────────────
- *  TODO A — Load a JPG texture onto each card
+ * ── Your 6 TODOs ─────────────────────────────────────────────────────────────
+ *  DONE A — Load a JPG texture onto each card
  *  TODO B — Add a timeline scrubber that moves the cards
  *  TODO C — Make cards snap to a grid when placed
  *  TODO D — Add a bloom / glow post-processing effect
+ *  TODO E — Fix the race condition in the AI streaming call
+ *  TODO F — Measure and display GPU render time per frame
  *
  * ── Setup ────────────────────────────────────────────────────────────────────
  *  npm install three @types/three
@@ -139,10 +141,13 @@ export default function ConceptCanvas() {
 
   // TODO D — add a ref for your composer here
 
+  // TODO E — add a ref to hold an AbortController here so you can cancel in-flight AI requests
+
   // React state only for UI — labels, panel text, fps readout
   const [hoveredId,    setHoveredId]    = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<ConceptCard | null>(null);
   const [fps,          setFps]          = useState(0);
+  const [renderMs,     setRenderMs]     = useState(0); // TODO F — render time in ms
   const [aiText,       setAiText]       = useState("");
   const [aiStatus,     setAiStatus]     = useState<AiStatus>("idle");
 
@@ -212,8 +217,13 @@ export default function ConceptCanvas() {
       mesh.userData.cardId = card.id;
       group.add(mesh);
 
-      // TODO A — load a texture and apply it to mat here
-
+      // DONE A — load a texture and apply it to mat here
+      const loader = new THREE.TextureLoader();
+      loader.load('/textures/metal.jpg', (texture) => {
+        mat.map = texture;
+        mat.needsUpdate = true;
+      });
+      
       // Bezel outline
       const bezel = new THREE.Mesh(
         new THREE.PlaneGeometry(1.76, 1.11),
@@ -252,6 +262,8 @@ export default function ConceptCanvas() {
       });
 
       // TODO D — call composer.render() here instead once bloom is set up
+      // TODO F — measure how long renderer.render() takes using performance.now()
+      //           before and after, then call setRenderMs() with the result (once/sec like FPS)
       renderer.render(scene, camera);
     };
     animate();
@@ -376,13 +388,22 @@ export default function ConceptCanvas() {
         <span style={{ color: "#fff", fontSize: 11, letterSpacing: "0.2em", opacity: 0.4 }}>
           VISCOM · CONCEPT CANVAS
         </span>
-        <span style={{
-          color: fps > 55 ? "#5ec46e" : fps > 30 ? "#f5e642" : "#e87c3e",
-          fontSize: 11, letterSpacing: "0.1em",
-          background: "rgba(255,255,255,0.04)", padding: "3px 10px", borderRadius: 3,
-        }}>
-          {fps} FPS
-        </span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <span style={{
+            color: renderMs < 8 ? "#5ec46e" : renderMs < 16 ? "#f5e642" : "#e87c3e",
+            fontSize: 11, letterSpacing: "0.1em",
+            background: "rgba(255,255,255,0.04)", padding: "3px 10px", borderRadius: 3,
+          }}>
+            {renderMs.toFixed(1)} ms
+          </span>
+          <span style={{
+            color: fps > 55 ? "#5ec46e" : fps > 30 ? "#f5e642" : "#e87c3e",
+            fontSize: 11, letterSpacing: "0.1em",
+            background: "rgba(255,255,255,0.04)", padding: "3px 10px", borderRadius: 3,
+          }}>
+            {fps} FPS
+          </span>
+        </div>
       </div>
 
       {/* TODO B — render your timeline scrubber UI here */}
